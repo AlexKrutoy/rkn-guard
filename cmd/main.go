@@ -42,6 +42,10 @@ func main() {
 		Short:   "Инструмент для блокировки подсетей сканеров",
 		Long:    `Скачивает списки подсетей и применяет блокировки через выбранный firewall.`,
 		Version: version,
+		// Ошибку исполнения печатаем сами, без простыни Usage: она нужна только
+		// при неверных флагах и аргументах, а cobra показывает её и так.
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Если указан уровень сообщений, применяем его.
 			if logLevel != "" {
@@ -113,6 +117,7 @@ func main() {
 	rootCmd.AddCommand(newSourcesCommand())
 	rootCmd.AddCommand(newExceptionsCommand())
 	rootCmd.AddCommand(newManualIPsCommand())
+	rootCmd.AddCommand(newGuardCommand())
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "stats",
 		Short: "Обновить статистику и показать все зарегистрированные адреса",

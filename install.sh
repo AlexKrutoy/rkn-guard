@@ -766,6 +766,111 @@ refresh_firewall_status() {
     fi
 }
 
+# --- АДАПТИВНЫЙ ЩИТ ---
+# Число адресов в бане для строки состояния. Если nft недоступен, показываем прочерк.
+guard_ban_count() {
+    local count
+    count=$(nft -j list set inet rkn_guard_dynamic banned4 2>/dev/null | python3 -c '
+import json, sys
+try:
+    doc = json.load(sys.stdin)
+except Exception:
+    print("0")
+    raise SystemExit
+total = 0
+for item in doc.get("nftables", []):
+    s = item.get("set")
+    if not s:
+        continue
+    for el in s.get("elem", []):
+        total += 1
+print(total)
+' 2>/dev/null) || count=''
+    [[ -z "$count" ]] && count='—'
+    printf '%s' "$count"
+}
+
+guard_menu() {
+    local choice lvl addr url
+    while true; do
+        clear
+        echo -e "${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
+        echo -e "${CYAN}║            🛡️  АДАПТИВНЫЙ ЩИТ (nftables)             ║${NC}"
+        echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
+        rkn-guard guard status 2>&1 | sed 's/^/  /'
+        echo ""
+        echo -e " ${GREEN}1.${NC} ▶️  Применить (профиль)"
+        echo -e " ${GREEN}2.${NC} 📜 Показать правила (plan)"
+        echo -e " ${GREEN}3.${NC} 🚫 Кто в бане"
+        echo -e " ${GREEN}4.${NC} ⛔ Забанить адрес"
+        echo -e " ${GREEN}5.${NC} ✅ Снять бан с адреса"
+        echo -e " ${GREEN}6.${NC} 🤍 Белый список"
+        echo -e " ${GREEN}7.${NC} 📡 Внешние списки адресов"
+        echo -e " ${RED}8.${NC} 🧨 Снять щит (rollback)"
+        echo -e " ${RED}0.${NC} ❌ Назад"
+        echo ""
+        echo -ne "${CYAN}👉 Ваш выбор:${NC} "
+        read -r choice < /dev/tty || terminal_unavailable
+        case $choice in
+            1)
+                echo -e "  Профили: ${BOLD}relaxed${NC} 900/мин · ${BOLD}basic${NC} 600/мин · ${BOLD}enhanced${NC} 300/мин · ${BOLD}strict${NC} 100/мин · ${BOLD}custom${NC}"
+                echo -ne "  Профиль [enhanced]: "
+                read -r lvl < /dev/tty || terminal_unavailable
+                lvl=${lvl:-enhanced}
+                if [[ "$lvl" == custom ]]; then
+                    local rate ban
+                    echo -ne "  Порог новых соединений в минуту [60]: "
+                    read -r rate < /dev/tty || terminal_unavailable
+                    echo -ne "  Срок бана [1h]: "
+                    read -r ban < /dev/tty || terminal_unavailable
+                    rkn-guard guard apply --level custom --rate "${rate:-60}" --ban-time "${ban:-1h}"
+                else
+                    rkn-guard guard apply --level "$lvl"
+                fi
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            2) rkn-guard guard plan | less ;;
+            3) rkn-guard guard top; read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable ;;
+            4)
+                echo -ne "  Адрес: "
+                read -r addr < /dev/tty || terminal_unavailable
+                [[ -n "$addr" ]] && rkn-guard guard ban "$addr"
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            5)
+                echo -ne "  Адрес: "
+                read -r addr < /dev/tty || terminal_unavailable
+                [[ -n "$addr" ]] && rkn-guard guard unban "$addr"
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            6)
+                echo -ne "  Добавить адрес или подсеть (пусто — только показать): "
+                read -r addr < /dev/tty || terminal_unavailable
+                [[ -n "$addr" ]] && rkn-guard guard allow add "$addr"
+                rkn-guard guard allow list
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            7)
+                rkn-guard guard feed list
+                echo -ne "  Добавить URL (пусто — назад): "
+                read -r url < /dev/tty || terminal_unavailable
+                if [[ -n "$url" ]]; then
+                    rkn-guard guard feed add "$url" && rkn-guard guard apply
+                fi
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            8)
+                echo -ne "  Снять правила щита и автозапуск? [y/N]: "
+                read -r addr < /dev/tty || terminal_unavailable
+                [[ "$addr" == y || "$addr" == Y ]] && rkn-guard guard rollback
+                read -r -p $'\n[Enter] назад...' _ < /dev/tty || terminal_unavailable
+                ;;
+            0) return 0 ;;
+            *) echo "Неверно"; sleep 1 ;;
+        esac
+    done
+}
+
 panel_menu() {
     local answer host port client client_port family route
     printf '\nСкачать панель: https://github.com/Flecksis/rkn-guard-panel/releases/latest\n'
@@ -825,6 +930,7 @@ show_menu() {
         echo -e "${CYAN}╠══════════════════════════════════════════════════════╣${NC}"
         show_subnet_summary "$IPSET_CNT"
         printf "${CYAN}║${NC}  🔥 Атак отбито:    ${RED}%-33s${NC}${CYAN}║${NC}\n" "$PKTS_CNT"
+        printf "${CYAN}║${NC}  🛡 В бане щита:    ${YELLOW}%-33s${NC}${CYAN}║${NC}\n" "$(guard_ban_count)"
         echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
         echo -e "  ${DIM}└─${NC} ${BOLD}${GREEN}◆ ${CURRENT_VERSION}${NC} ${DIM}·${NC} ${YELLOW}${CURRENT_BRANCH}${NC} ${DIM}· ${UPDATE_STATUS}${NC}"
         printf '  Firewall: %s\n' "$FW_LABEL"
@@ -835,14 +941,15 @@ show_menu() {
         echo -e " ${GREEN}4.${NC} 🧪 Управление IP (Ban/Unban)"
         echo -e " ${GREEN}5.${NC} 🔄 Обновление списков и расписание"
         echo -e " ${GREEN}6.${NC} 📡 Доп списки подсетей"
-        echo -e " ${GREEN}7.${NC} ⬆️  Обновить rkn-guard"
-        echo -e " ${GREEN}8.${NC} 🛠️  Переустановить (Reinstall)"
+        echo -e " ${GREEN}7.${NC} 🛡 Адаптивный щит (автобан сканеров)"
+        echo -e " ${GREEN}8.${NC} ⬆️  Обновить rkn-guard"
+        echo -e " ${GREEN}9.${NC} 🛠️  Переустановить (Reinstall)"
         if [[ -d /var/lib/rkn-guard-panel ]]; then
-            echo -e " ${GREEN}9.${NC} Удалить привязку к панели rkn-guard-panel"
+            echo -e " ${GREEN}10.${NC} Удалить привязку к панели rkn-guard-panel"
         else
-            echo -e " ${GREEN}9.${NC} Подключить к панели rkn-guard-panel"
+            echo -e " ${GREEN}10.${NC} Подключить к панели rkn-guard-panel"
         fi
-        echo -e " ${RED}10.${NC} 🗑️  Удалить (Uninstall)"
+        echo -e " ${RED}11.${NC} 🗑️  Удалить (Uninstall)"
         echo -e " ${RED}0.${NC} ❌ Выход"
         echo ""
 
@@ -859,14 +966,15 @@ show_menu() {
             4) manage_test_ip ;;
             5) manage_updates ;;
             6) manage_extra_lists ;;
-            7)
+            7) guard_menu ;;
+            8)
                 update_application
                 ;;
-            8)
+            9)
                 install_process
                 ;;
-            10) uninstall_process ;;
-            9) panel_menu; read_cancellable_input -p '[Enter] назад...' _ ;;
+            11) uninstall_process ;;
+            10) panel_menu; read_cancellable_input -p '[Enter] назад...' _ ;;
             0) exit 0 ;;
             *) echo "Неверно"; sleep 1 ;;
         esac

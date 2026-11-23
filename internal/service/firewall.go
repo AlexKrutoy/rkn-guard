@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -173,22 +174,62 @@ func RemoveNFT(cmd *CommandService) error {
 	return nil
 }
 
+// ApplyNFTState применяет состояние firewall. Белый список адаптивного щита читается
+// best-effort: если его конфиг повреждён, обычная блокировка должна продолжать работать.
 func ApplyNFTState(cmd *CommandService, state *FirewallState, setsOnly bool) error {
-	entries, err := LoadExceptions(ExceptionsPath)
+	allow, _ := GuardAllowForBlocklist()
+	return ApplyNFTStateWithAllow(cmd, state, setsOnly, allow)
+}
+
+// ApplyNFTStateWithAllow — та же работа, но белый список передаётся явно.
+func ApplyNFTStateWithAllow(cmd *CommandService, state *FirewallState, setsOnly bool, allow []netip.Prefix) error {
+	script, err := renderNFTStateScript(state, allow, setsOnly)
 	if err != nil {
 		return err
+	}
+	return runNFT(cmd, script)
+}
+
+// renderNFTStateScript собирает скрипт блокировки: сети, ручные адреса, исключения и белый список.
+func renderNFTStateScript(state *FirewallState, allow []netip.Prefix, setsOnly bool) (string, error) {
+	entries, err := LoadExceptions(ExceptionsPath)
+	if err != nil {
+		return "", err
 	}
 	networks := state.Networks
 	networks.IPv4Subnets = append([]string(nil), networks.IPv4Subnets...)
 	networks.IPv6Subnets = append([]string(nil), networks.IPv6Subnets...)
 	if err := AddManualNetworks(&networks); err != nil {
-		return err
+		return "", err
 	}
-	script, err := RenderNFT(&networks, entries, state.Logging, setsOnly)
+	return RenderNFTWithAllow(&networks, entries, allow, state.Logging, setsOnly)
+}
+
+// RebuildNFTState пересобирает таблицу rkn_guard целиком вместе с белым списком.
+// delete и add идут одной транзакцией nft, поэтому окна без защиты не возникает.
+func RebuildNFTState(cmd *CommandService, state *FirewallState, allow []netip.Prefix) error {
+	script, err := renderNFTStateScript(state, allow, false)
 	if err != nil {
 		return err
 	}
+	if nftTableExists(cmd, "rkn_guard") {
+		script = "delete table inet rkn_guard\n" + script
+	}
 	return runNFT(cmd, script)
+}
+
+// nftTableExists проверяет таблицу по имени, не разбирая чужой вывод.
+func nftTableExists(cmd *CommandService, name string) bool {
+	tables, err := cmd.RunOutputQuiet("nft", "list", "tables")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(tables, "\n") {
+		if strings.TrimSpace(line) == "table inet "+name {
+			return true
+		}
+	}
+	return false
 }
 
 func CommitNFTState(cmd *CommandService, next *FirewallState, setsOnly bool) error {

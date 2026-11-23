@@ -27,6 +27,13 @@ func nftPrefixes(values []string, ipv6 bool) ([]string, error) {
 }
 
 func RenderNFT(networks *domain.NetworkList, exceptions []Exception, logging, setsOnly bool) (string, error) {
+	return RenderNFTWithAllow(networks, exceptions, nil, logging, setsOnly)
+}
+
+// RenderNFTWithAllow добавляет белый список адаптивного щита первым правилом блокировки.
+// Без него подсеть из списка, в которой оказался адрес администратора, отрезала бы вход
+// в сервер — ровно та ошибка, из-за которой HUBGuard вообще перестал банить подсетями.
+func RenderNFTWithAllow(networks *domain.NetworkList, exceptions []Exception, allow []netip.Prefix, logging, setsOnly bool) (string, error) {
 	if networks == nil {
 		return "", fmt.Errorf("нет списков")
 	}
@@ -38,6 +45,17 @@ func RenderNFT(networks *domain.NetworkList, exceptions []Exception, logging, se
 	if err != nil {
 		return "", err
 	}
+	var allowV4, allowV6 []string
+	for _, prefix := range CollapseGuardPrefixes(allow) {
+		if !prefix.IsValid() || prefix.Addr().Is4In6() {
+			continue
+		}
+		if prefix.Addr().Is4() {
+			allowV4 = append(allowV4, prefix.String())
+		} else {
+			allowV6 = append(allowV6, prefix.String())
+		}
+	}
 	var out strings.Builder
 	if !setsOnly {
 		out.WriteString("add table inet rkn_guard\n")
@@ -45,6 +63,19 @@ func RenderNFT(networks *domain.NetworkList, exceptions []Exception, logging, se
 		out.WriteString("add set inet rkn_guard blocked6 { type ipv6_addr; flags interval; auto-merge; }\n")
 		out.WriteString("add chain inet rkn_guard input { type filter hook input priority -10; policy accept; }\nflush chain inet rkn_guard input\n")
 		out.WriteString("add rule inet rkn_guard input ct state established,related return\n")
+		for _, group := range []struct {
+			family  string
+			entries []string
+		}{{"ip", allowV4}, {"ip6", allowV6}} {
+			for start := 0; start < len(group.entries); start += guardElementsPerLine {
+				end := start + guardElementsPerLine
+				if end > len(group.entries) {
+					end = len(group.entries)
+				}
+				fmt.Fprintf(&out, "add rule inet rkn_guard input %s saddr { %s } return\n",
+					group.family, strings.Join(group.entries[start:end], ", "))
+			}
+		}
 		for _, e := range exceptions {
 			checked, err := ParseException(e.IP, e.Protocol, fmt.Sprint(e.Port))
 			if err != nil || checked != e {

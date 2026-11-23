@@ -62,6 +62,7 @@ func (s *UninstallerService) Uninstall(removeLogs bool) error {
 	s.logger.Info().Msg("rkn-guard does not modify Linux routing tables (ip rule/ip route), skipping routing rollback")
 
 	s.stopAndDisableServices()
+	s.cleanupGuardShield()
 	s.cleanupIPTablesRuntime()
 	if err := s.cleanupUFWBeforeRules(); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to cleanup UFW before.rules markers")
@@ -93,6 +94,7 @@ func (s *UninstallerService) stopAndDisableServices() {
 
 	services := []string{
 		"rkn-guard-firewall.service",
+		"rkn-guard-guard.service",
 		"rkn-guard-update.timer",
 		"rkn-guard-update.service",
 		"antiscan-aggregate.timer",
@@ -107,6 +109,24 @@ func (s *UninstallerService) stopAndDisableServices() {
 		}
 		if err := s.cmdSvc.DisableService(serviceName); err != nil {
 			s.logger.Warn().Err(err).Str("service", serviceName).Msg("Disable failed, continuing")
+		}
+	}
+}
+
+// cleanupGuardShield снимает адаптивный щит: своя таблица nftables удаляется целиком,
+// состояние банов и фидов стирается, чтобы переустановка началась с чистого листа.
+func (s *UninstallerService) cleanupGuardShield() {
+	if s.cmdSvc.CommandExists("nft") {
+		if err := s.cmdSvc.Run("nft", "delete", "table", "inet", GuardTable); err != nil {
+			s.logger.Warn().Err(err).Str("table", GuardTable).Msg("Failed to delete guard nftables table, continuing")
+		}
+	} else {
+		s.logger.Warn().Msg("nft not found, skipping guard table cleanup")
+	}
+
+	for _, path := range []string{GuardUnitPath, GuardConfigPath, GuardBansPath, GuardFeedsPath} {
+		if err := removeFileIfExists(path); err != nil {
+			s.logger.Warn().Err(err).Str("path", path).Msg("Failed to remove guard file, continuing")
 		}
 	}
 }
