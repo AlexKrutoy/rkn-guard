@@ -143,8 +143,9 @@ class MenuTests(MenuHarness):
             ("uninstall_process", "", []),
             ("offer_install_schedule", "", []),
             ("show_menu", "6\n", []),
-            ("show_menu", "9\n", []),
+            ("show_menu", "7\n", ["rkn-guard guard"]),
             ("show_menu", "10\n", []),
+            ("show_menu", "11\n", []),
             ("manage_extra_lists", "", []),
             ("manage_extra_lists", "1\n", []),
             ("manage_extra_lists", "2\n", []),
@@ -165,16 +166,16 @@ class MenuTests(MenuHarness):
         self.mock_run("show_menu", "5\n1\n", actions=["rkn-guard update"], LOSE_TTY="1")
 
     def test_normal_navigation(self):
-        self.mock_run("show_menu", "5\n1\n0\n4\n0\n10\nn\n0\n", status=0,
+        self.mock_run("show_menu", "5\n1\n0\n4\n0\n11\nn\n0\n", status=0,
                       actions=["rkn-guard update"])
 
     def test_panel_uses_ssh_server_endpoint_without_prompting(self):
-        self.mock_run("show_menu", "9\ny\n\n0\n", status=0,
+        self.mock_run("show_menu", "10\ny\n\n0\n", status=0,
                       actions=["rkn-guard panel issue 192.0.2.25 2222"],
                       SSH_CONNECTION="192.0.2.10 51000 192.0.2.25 2222")
 
     def test_reordered_menu_actions(self):
-        self.mock_run("show_menu", "6\n2\n1\n0\n7\n8\n0\n", status=0,
+        self.mock_run("show_menu", "6\n2\n1\n0\n8\n9\n0\n", status=0,
                       actions=["source enable 1", "rkn-guard update", "application-update", "install"])
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Requires Linux timezone data")
