@@ -707,6 +707,10 @@ install_process() {
 
 offer_install_schedule() {
     local answer
+    if [[ ! -t 0 && ! -t 1 ]]; then
+        printf 'Терминала нет: автообновление подсетей не включалось (можно включить позже в меню обновлений).\n'
+        return 0
+    fi
     while true; do
         read_cancellable_input -p 'Включить автообновление подсетей ежедневно в 06:00 по локальному времени сервера? [y/N]: ' answer || return 0
         case "$answer" in
