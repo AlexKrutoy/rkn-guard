@@ -645,6 +645,17 @@ install_process() {
     echo -e "${CYAN}🚀 УСТАНОВКА RKN-GUARD${NC}"
     if [[ ${1:-} == panel ]]; then
         case "$2" in auto|iptables|nftables|firewalld) FIREWALL_CHOICE=$2 ;; *) return 1 ;; esac
+    elif [[ -n ${1:-} && ${1:-} != panel ]]; then
+        # Неинтерактивный выбор: install nftables, install auto и т.п.
+        case "$1" in
+            auto|iptables|nftables|firewalld) FIREWALL_CHOICE=$1 ;;
+            *) printf 'Неизвестный firewall: %s\n' "$1" >&2; return 1 ;;
+        esac
+    elif [[ ! -t 0 && ! -t 1 ]]; then
+        # Ни stdin, ни stdout не терминал (CI, cron, pipe в лог) — берём авторежим,
+        # иначе установка зависнет на приглашении, которого никто не увидит.
+        printf 'Терминал недоступен: выбран автоматический режим.\n'
+        FIREWALL_CHOICE=auto
     else
         choose_firewall || return 1
     fi
@@ -987,7 +998,7 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
 fi
 check_root
 case "${1:-}" in
-    install) install_process ;;
+    install) install_process "${2:-}" ;;
     monitor) show_menu ;;
     panel-update) RKN_PANEL_PROGRESS=1 update_application panel ;;
     panel-reinstall) DEBIAN_FRONTEND=noninteractive install_process panel "${2:-auto}" ;;

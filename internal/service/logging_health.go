@@ -89,7 +89,8 @@ func sendLogProbe(backend, family, host, iptables, prefix string) (result error)
 	port := strconv.Itoa(addr.Port)
 	var cleanup func() error
 	if backend == "iptables" {
-		rule := []string{"-o", "lo", "-s", host, "-d", host, "-p", "udp", "--sport", port, "--dport", port, "-j", "LOG", "--log-prefix", prefix}
+		// Без -o lo по той же причине, что и в nft-ветке: в WSL 127.0.0.1 идёт не через lo.
+		rule := []string{"-s", host, "-d", host, "-p", "udp", "--sport", port, "--dport", port, "-j", "LOG", "--log-prefix", prefix}
 		err = runProbeCommand(iptables, append([]string{"-w", "5", "-I", "OUTPUT", "1"}, rule...)...)
 		cleanup = func() error {
 			return runProbeCommand(iptables, append([]string{"-w", "5", "-D", "OUTPUT"}, rule...)...)
@@ -100,7 +101,9 @@ func sendLogProbe(backend, family, host, iptables, prefix string) (result error)
 		if family == "6" {
 			proto = "ip6"
 		}
-		script := fmt.Sprintf("create table inet %s\nadd chain inet %s output { type filter hook output priority -301; policy accept; }\nadd rule inet %s output oifname \"lo\" %s saddr %s %s daddr %s udp sport %s udp dport %s log prefix %q\n", table, table, table, proto, host, proto, host, port, port, prefix)
+		// oifname не проверяем: в WSL и части контейнеров 127.0.0.1 маршрутизируется
+		// через отдельный интерфейс, и правило с oifname "lo" никогда не срабатывает.
+		script := fmt.Sprintf("create table inet %s\nadd chain inet %s output { type filter hook output priority -301; policy accept; }\nadd rule inet %s output %s saddr %s %s daddr %s udp sport %s udp dport %s log prefix %q\n", table, table, table, proto, host, proto, host, port, port, prefix)
 		cmd := exec.Command("nft", "-f", "-")
 		cmd.Stdin = strings.NewReader(script)
 		if out, cmdErr := cmd.CombinedOutput(); cmdErr != nil {
