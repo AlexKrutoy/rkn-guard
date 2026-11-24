@@ -11,7 +11,7 @@ manager=$(mktemp /opt/.rkn-guard-manager.XXXXXX)
 wrapper=$(mktemp /usr/local/bin/.rkn.XXXXXX)
 trap 'rm -rf -- "$work"; rm -f -- "$binary" "$manager" "$wrapper"' EXIT
 if [[ ${RKN_PANEL_PROGRESS:-} == 1 ]]; then printf '%s\n' 'RKN_STAGE:clone'; fi
-git clone -q --depth 1 --single-branch --branch "$branch" https://github.com/Flecksis/rkn-guard.git "$work/src"
+git clone -q --depth 1 --single-branch --branch "$branch" https://github.com/AlexKrutoy/rkn-guard.git "$work/src"
 cd "$work/src"
 revision=$(git rev-parse --short HEAD)
 if [[ $branch == master ]]; then

@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # Сбрасываем цвет.
 
 # Константы
-REPO="Flecksis/rkn-guard"
+REPO="AlexKrutoy/rkn-guard"
 BINARY_NAME="rkn-guard"
 INSTALL_DIR="/usr/local/bin"
 LATEST_RELEASE_URL="https://github.com/${REPO}/releases/latest/download"

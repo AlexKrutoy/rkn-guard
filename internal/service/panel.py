@@ -331,13 +331,13 @@ def available_version(branch):
         pass
     try:
         if branch == "master":
-            with urllib.request.urlopen("https://api.github.com/repos/Flecksis/rkn-guard/releases/latest", timeout=7) as response:
+            with urllib.request.urlopen("https://api.github.com/repos/AlexKrutoy/rkn-guard/releases/latest", timeout=7) as response:
                 revision = json.load(response)["tag_name"]
             if not re.fullmatch(r"v\d+\.\d+\.\d+", revision):
                 return None
         else:
             output = subprocess.check_output(
-                ["git", "ls-remote", "--exit-code", "https://github.com/Flecksis/rkn-guard.git", "refs/heads/dev"],
+                ["git", "ls-remote", "--exit-code", "https://github.com/AlexKrutoy/rkn-guard.git", "refs/heads/dev"],
                 text=True, stderr=subprocess.DEVNULL, timeout=7,
                 env=dict(os.environ, GIT_TERMINAL_PROMPT="0"),
             )

@@ -6,23 +6,25 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/40ab4712-c541-415c-8121-005717a3d189" width="520" alt="Терминальное меню rkn-guard"></p>
 
-> **Помочь с оплатой серверов и разработкой, и на корм автору**
+> **О проекте**
 >
-> Для анализа сетевого трафика я арендую серверы. Если вам пригодился rkn-guard, можно поддержать эту работу пополнением баланса в моём сервисе. Спасибо за помощь с арендой!
->
-> **[Поддержать автора через X3D VPN →](https://t.me/X3D_vpn_bot)**
+> Форк [rkn-guard](https://github.com/Flecksis/rkn-guard) авторства Flecksis (MIT).
+> Оригинал фильтрует трафик по спискам подсетей; здесь добавлен адаптивный щит на `nftables`,
+> который банит источник по числу новых соединений и снимает бан по сроку.
 
 ## Установка
 
 Для установки нужны Linux с systemd, `curl` и права root или `sudo`. Установщик скачает готовый бинарник и поставит зависимости.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Flecksis/rkn-guard/master/install.sh | sudo bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/AlexKrutoy/rkn-guard/master/install.sh | sudo bash -s -- install
 ```
 
 Автоматический режим определяет текущий межсетевой экран и выбирает nftables на чистом сервере. Вручную можно выбрать nftables, iptables + ipset (в том числе с UFW) или активный firewalld с бэкендом nftables.
 
 ## Переход между dev и master на установленном сервере
+
+В форке сейчас есть только ветка `master`, поэтому переход на `dev` сработает лишь после того, как вы создадите эту ветку в своём репозитории. Механизм обновления из стабильного релиза работает как в оригинале.
 
 Команды выполняются на Linux-сервере с установленным rkn-guard и systemd. Для сборки нужны Git и Go версии из go.mod (сейчас 1.25.3) или Go 1.21+ с доступной автоматической загрузкой toolchain. Нужен доступ к GitHub и зависимостям Go. На Debian/Ubuntu установите инструменты через apt, на Fedora/RHEL-подобных системах — через dnf.
 
@@ -36,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/Flecksis/rkn-guard/master/install.s
 **Перейти на dev**
 
 ```bash
-switcher=$(mktemp) && curl -fsSLo "$switcher" https://raw.githubusercontent.com/Flecksis/rkn-guard/master/switch-branch.sh &&
+switcher=$(mktemp) && curl -fsSLo "$switcher" https://raw.githubusercontent.com/AlexKrutoy/rkn-guard/master/switch-branch.sh &&
 sudo bash "$switcher" dev && rm -f "$switcher"
 rkn-guard build-info
 sudo rkn
@@ -45,7 +47,7 @@ sudo rkn
 **Вернуться на master**
 
 ```bash
-switcher=$(mktemp) && curl -fsSLo "$switcher" https://raw.githubusercontent.com/Flecksis/rkn-guard/master/switch-branch.sh &&
+switcher=$(mktemp) && curl -fsSLo "$switcher" https://raw.githubusercontent.com/AlexKrutoy/rkn-guard/master/switch-branch.sh &&
 sudo bash "$switcher" master && rm -f "$switcher"
 rkn-guard build-info
 ```
@@ -280,4 +282,4 @@ sudo rkn-guard uninstall --remove-logs
 
 ---
 
-[Релизы](https://github.com/Flecksis/rkn-guard/releases) · [Лицензия MIT](https://github.com/Flecksis/rkn-guard/blob/master/LICENSE) · [Поддержать автора](https://t.me/X3D_vpn_bot)
+[Релизы](https://github.com/AlexKrutoy/rkn-guard/releases) · [Лицензия MIT](https://github.com/AlexKrutoy/rkn-guard/blob/master/LICENSE) · [Оригинальный проект](https://github.com/Flecksis/rkn-guard)

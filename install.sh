@@ -7,8 +7,8 @@ fi
 # --- ЦВЕТА ---
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
-TG_URL="https://raw.githubusercontent.com/Flecksis/rkn-guard/master/app%20install.sh"
-MANAGER_URL="https://raw.githubusercontent.com/Flecksis/rkn-guard/master/install.sh"
+TG_URL="https://raw.githubusercontent.com/AlexKrutoy/rkn-guard/master/app%20install.sh"
+MANAGER_URL="https://raw.githubusercontent.com/AlexKrutoy/rkn-guard/master/install.sh"
 MANAGER_PATH="/opt/rkn-guard-manager.sh"
 MENU_COMMAND="/usr/local/bin/rkn"
 LIST_GOV="https://raw.githubusercontent.com/shadow-netlab/traffic-guard-lists/refs/heads/main/public/government_networks.list"
@@ -45,7 +45,7 @@ base_source_args() {
     for url in "${BASE_SOURCE_ARGS[@]}"; do SOURCE_ARGS+=("$flag" "$url"); done
 }
 MANUAL_FILE="/opt/rkn-guard-manual.list"
-RELEASE_API="https://api.github.com/repos/Flecksis/rkn-guard/releases/latest"
+RELEASE_API="https://api.github.com/repos/AlexKrutoy/rkn-guard/releases/latest"
 CURRENT_VERSION="не установлена"
 CURRENT_BRANCH="неизвестна"
 LATEST_VERSION=""
